@@ -6,7 +6,8 @@ from tkinter import ttk
 from collections import Counter
 import math
 import time
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
+
 class No:
     #Nó da árvore binária de Huffman.
     def __init__(self, char, freq):
@@ -392,6 +393,25 @@ class App(tk.Tk):
         widget.see("end")
         widget.config(state="disabled")
 
+    def _browse(self, entry, tipos):
+        path = filedialog.askopenfilename(filetypes=tipos)
+        if path:
+            entry.delete(0, "end")
+            entry.insert(0, path)
+            # Sugerir nome de saída automaticamente
+            base, _ = os.path.splitext(path)
+            if entry is self.entrada_comp and not self.saida_comp.get():
+                self.saida_comp.delete(0, "end")
+                self.saida_comp.insert(0, base + ".huff")
+            elif entry is self.entrada_decomp and not self.saida_decomp.get():
+                self.saida_decomp.delete(0, "end")
+                self.saida_decomp.insert(0, base + "_restaurado.txt")
+
+    def _save_as(self, entry, tipos, ext):
+        path = filedialog.asksaveasfilename(filetypes=tipos, defaultextension=ext)
+        if path:
+            entry.delete(0, "end")
+            entry.insert(0, path)
 
 if __name__ == "__main__":
     app = App()
