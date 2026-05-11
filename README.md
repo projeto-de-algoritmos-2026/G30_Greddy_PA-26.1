@@ -9,7 +9,7 @@ Conteúdo da Disciplina: Algoritmos Ambiciosos<br>
 |Matrícula | Aluno |
 | -- | -- |
 | 20/0032364  |  Vitor Gabriel Gonçalves Dias |
-| 22/1008632  |  Eduardo Ferreira |
+| 22/1008632  |  Eduardo de Almeida Ferreira |
 
 ## Sobre 
 Este projeto implementa um compactador e descompactador de arquivos de texto utilizando o Algoritmo de Huffman, um exemplo clássico de algoritmo guloso (greedy).
@@ -26,7 +26,10 @@ Exibir estatísticas detalhadas: taxa de compressão, entropia de Shannon, compr
 Inspecionar o conteúdo interno de um arquivo .huff (árvore, bits, overhead)
 
 ## Screenshots
-Adicione 3 ou mais screenshots do projeto em funcionamento.
+![Exemplo 1 - Projeto](assets/image1.png)
+![Exemplo 2 - Projeto](assets/image2.png)
+![Exemplo 3 - Projeto](assets/image3.png)
+![Exemplo 4 - Projeto](assets/image4.png)
 
 ## Instalação 
 Linguagem: Python 3.10+<br>
