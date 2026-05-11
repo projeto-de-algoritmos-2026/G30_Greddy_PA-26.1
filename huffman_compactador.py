@@ -1,7 +1,8 @@
 import os
 import heapq
-import tempfile
 import pickle
+import tkinter as tk
+from tkinter import ttk
 from collections import Counter
 import math
 import time
@@ -183,62 +184,76 @@ def descompactar_arquivo(caminho_entrada: str, caminho_saida: str) -> dict:
         "verificado": True,
     }
 
+#Interface
 
-#testa o compactador e descompactador
-def teste_compactador():
-    texto = "ABRACADABRA"
-    with tempfile.TemporaryDirectory() as tmpdir:
-        caminho_txt = os.path.join(tmpdir, "teste.txt")
-        caminho_huff = os.path.join(tmpdir, "teste.huff")
-
-        with open(caminho_txt, "w", encoding="utf-8") as f:
-            f.write(texto)
-
-        stats = compactar_arquivo(caminho_txt, caminho_huff)
-
-        print("Teste de compactação")
-        print(f"  Arquivo de entrada: {caminho_txt}")
-        print(f"  Arquivo de saída:   {caminho_huff}")
-        print(f"  Tamanho original:   {stats['tamanho_original_bytes']} bytes")
-        print(f"  Tamanho comprimido: {stats['tamanho_comprimido_bytes']} bytes")
-        print(f"  Taxa de compressão: {stats['taxa_compressao']:.2f}%")
-
-        assert os.path.exists(caminho_huff), "Arquivo .huff não foi criado"
-        assert stats["tamanho_comprimido_bytes"] > 0, "Arquivo comprimido está vazio"
-
-        return stats
+COR_BG       = "#0f1117"
+COR_PAINEL   = "#1a1d27"
+COR_BORDA    = "#2a2d3e"
+COR_ROXO     = "#7f77dd"
+COR_ROXO_ESC = "#534ab7"
+COR_VERDE    = "#1d9e75"
+COR_VERMELHO = "#e24b4a"
+COR_TEXTO    = "#e8e6f0"
+COR_MUTED    = "#6b6880"
+FONTE        = ("Consolas", 10)
+FONTE_TITULO = ("Consolas", 13, "bold")
+FONTE_MONO   = ("Consolas", 9)
 
 
-def teste_descompactador():
-    texto = "ABRACADABRA"
-    with tempfile.TemporaryDirectory() as tmpdir:
-        caminho_txt = os.path.join(tmpdir, "teste.txt")
-        caminho_huff = os.path.join(tmpdir, "teste.huff")
-        caminho_restaurado = os.path.join(tmpdir, "teste_restaurado.txt")
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Compactador Huffman")
+        self.geometry("780x640")
+        self.resizable(True, True)
+        self.configure(bg=COR_BG)
+        self.stats = None
+        self._build_ui()
 
-        with open(caminho_txt, "w", encoding="utf-8") as f:
-            f.write(texto)
+    # ── Layout principal ──────────────────────────────────
 
-        compactar_arquivo(caminho_txt, caminho_huff)
-        stats = descompactar_arquivo(caminho_huff, caminho_restaurado)
+    def _build_ui(self):
+        # Cabeçalho
+        cab = tk.Frame(self, bg=COR_BG)
+        cab.pack(fill="x", padx=24, pady=(20, 4))
+        tk.Label(cab, text="⬡ Compactador Huffman", font=FONTE_TITULO,
+                 bg=COR_BG, fg=COR_ROXO).pack(side="left")
+        tk.Label(cab, text="Algoritmo Guloso (Greedy)", font=("Consolas", 9),
+                 bg=COR_BG, fg=COR_MUTED).pack(side="left", padx=12)
 
-        with open(caminho_restaurado, "r", encoding="utf-8") as f:
-            texto_restaurado = f.read()
+        sep = tk.Frame(self, bg=COR_BORDA, height=1)
+        sep.pack(fill="x", padx=24, pady=(4, 16))
 
-        print("Teste de descompactação")
-        print(f"  Arquivo compactado:   {caminho_huff}")
-        print(f"  Arquivo restaurado:    {caminho_restaurado}")
-        print(f"  Texto restaurado:      {texto_restaurado!r}")
-        print(f"  Caracteres restaurados: {stats['caracteres_restaurados']}")
+        # Abas
+        nb = ttk.Notebook(self)
+        nb.pack(fill="both", expand=True, padx=24, pady=(0, 16))
+        self._style_notebook(nb)
 
-        assert texto_restaurado == texto, "Texto restaurado difere do original"
-        assert stats["verificado"] is True, "Descompactação não foi verificada"
+        self.aba_comp    = tk.Frame(nb, bg=COR_BG)
+        self.aba_decomp  = tk.Frame(nb, bg=COR_BG)
+        self.aba_stats   = tk.Frame(nb, bg=COR_BG)
+        self.aba_inspec  = tk.Frame(nb, bg=COR_BG)
 
-        return stats
+        nb.add(self.aba_comp,   text="  Compactar  ")
+        nb.add(self.aba_decomp, text="  Descompactar  ")
+        nb.add(self.aba_stats,  text="  Estatísticas  ")
+        nb.add(self.aba_inspec, text="  Inspecionar .huff  ")
+
+    def _style_notebook(self, nb):
+        s = ttk.Style()
+        s.theme_use("default")
+        s.configure("TNotebook",
+                     background=COR_BG, borderwidth=0, tabmargins=[0,0,0,0])
+        s.configure("TNotebook.Tab",
+                     background=COR_PAINEL, foreground=COR_MUTED,
+                     font=("Consolas", 10), padding=[12, 6],
+                     borderwidth=0, relief="flat")
+        s.map("TNotebook.Tab",
+              background=[("selected", COR_ROXO_ESC)],
+              foreground=[("selected", COR_TEXTO)])
+        
 
 
 if __name__ == "__main__":
-    teste_compactador()
-    print()
-    teste_descompactador()
-
+    app = App()
+    app.mainloop()
