@@ -1,6 +1,10 @@
+import os
 import heapq
+import tempfile
+import pickle
 from collections import Counter
-
+import math
+import time
 class No:
     #Nó da árvore binária de Huffman.
     def __init__(self, char, freq):
@@ -88,37 +92,153 @@ def decodificar(bits: str, raiz: No) -> str:
     return "".join(resultado)
 
 
+def compactar_arquivo(caminho_entrada: str, caminho_saida: str) -> dict:
+   #Lê um .txt, aplica Huffman e salva como .huff. Retorna dicionário com estatísticas da operação.
+  
+    t_inicio = time.time()
 
-#Testando a criação da arvore
-def imprimir_arvore(no, nivel=0):
-    if no is None:
-        return
-    indent = "  " * nivel
-    if no.char is not None:
-        print(f"{indent}Folha: '{no.char}' freq={no.freq}")
-    else:
-        print(f"{indent}No interno freq={no.freq}")
-    imprimir_arvore(no.esq, nivel + 1)
-    imprimir_arvore(no.dir, nivel + 1)
+    with open(caminho_entrada, "r", encoding="utf-8") as f:
+        texto = f.read()
+
+    if not texto:
+        raise ValueError("O arquivo está vazio.")
+
+    raiz, frequencias = construir_arvore(texto)
+    tabela = gerar_codigos(raiz)
+    bits = codificar(texto, tabela)
+    dados_comprimidos = bits_para_bytes(bits)
+
+    # Salva: (árvore serializada, dados comprimidos)
+    pacote = {
+        "arvore": raiz,
+        "dados": dados_comprimidos,
+        "nome_original": os.path.basename(caminho_entrada),
+        "tamanho_original": len(texto),
+    }
+    with open(caminho_saida, "wb") as f:
+        pickle.dump(pacote, f)
+
+    t_fim = time.time()
+    tamanho_orig  = os.path.getsize(caminho_entrada)
+    tamanho_comp  = os.path.getsize(caminho_saida)
+    taxa = (1 - tamanho_comp / tamanho_orig) * 100
+
+    # Entropia de Shannon
+    n = len(texto)
+    entropia = -sum(
+        (freq / n) * math.log2(freq / n)
+        for freq in frequencias.values()
+    )
+
+    # Comprimento médio dos códigos Huffman
+    comp_medio = sum(
+        (freq / n) * len(tabela[c])
+        for c, freq in frequencias.items()
+    )
+
+    return {
+        "operacao": "Compactação",
+        "arquivo_entrada": caminho_entrada,
+        "arquivo_saida": caminho_saida,
+        "tamanho_original_bytes": tamanho_orig,
+        "tamanho_comprimido_bytes": tamanho_comp,
+        "taxa_compressao": taxa,
+        "bits_original": tamanho_orig * 8,
+        "bits_comprimido": len(bits),
+        "caracteres_unicos": len(frequencias),
+        "total_caracteres": n,
+        "entropia_shannon": entropia,
+        "comprimento_medio_huffman": comp_medio,
+        "tempo_segundos": t_fim - t_inicio,
+        "tabela": tabela,
+        "frequencias": frequencias,
+    }
+
+
+def descompactar_arquivo(caminho_entrada: str, caminho_saida: str) -> dict:
+    # Lê um .huff e restaura o .txt original. Retorna dicionário com estatísticas.
+    
+    t_inicio = time.time()
+
+    with open(caminho_entrada, "rb") as f:
+        pacote = pickle.load(f)
+
+    raiz  = pacote["arvore"]
+    dados = pacote["dados"]
+    bits  = bytes_para_bits(dados)
+    texto = decodificar(bits, raiz)
+
+    with open(caminho_saida, "w", encoding="utf-8") as f:
+        f.write(texto)
+
+    t_fim = time.time()
+
+    return {
+        "operacao": "Descompactação",
+        "arquivo_entrada": caminho_entrada,
+        "arquivo_saida": caminho_saida,
+        "nome_original": pacote.get("nome_original", "—"),
+        "caracteres_restaurados": len(texto),
+        "tempo_segundos": t_fim - t_inicio,
+        "verificado": True,
+    }
+
+
+#testa o compactador e descompactador
+def teste_compactador():
+    texto = "ABRACADABRA"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        caminho_txt = os.path.join(tmpdir, "teste.txt")
+        caminho_huff = os.path.join(tmpdir, "teste.huff")
+
+        with open(caminho_txt, "w", encoding="utf-8") as f:
+            f.write(texto)
+
+        stats = compactar_arquivo(caminho_txt, caminho_huff)
+
+        print("Teste de compactação")
+        print(f"  Arquivo de entrada: {caminho_txt}")
+        print(f"  Arquivo de saída:   {caminho_huff}")
+        print(f"  Tamanho original:   {stats['tamanho_original_bytes']} bytes")
+        print(f"  Tamanho comprimido: {stats['tamanho_comprimido_bytes']} bytes")
+        print(f"  Taxa de compressão: {stats['taxa_compressao']:.2f}%")
+
+        assert os.path.exists(caminho_huff), "Arquivo .huff não foi criado"
+        assert stats["tamanho_comprimido_bytes"] > 0, "Arquivo comprimido está vazio"
+
+        return stats
+
+
+def teste_descompactador():
+    texto = "ABRACADABRA"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        caminho_txt = os.path.join(tmpdir, "teste.txt")
+        caminho_huff = os.path.join(tmpdir, "teste.huff")
+        caminho_restaurado = os.path.join(tmpdir, "teste_restaurado.txt")
+
+        with open(caminho_txt, "w", encoding="utf-8") as f:
+            f.write(texto)
+
+        compactar_arquivo(caminho_txt, caminho_huff)
+        stats = descompactar_arquivo(caminho_huff, caminho_restaurado)
+
+        with open(caminho_restaurado, "r", encoding="utf-8") as f:
+            texto_restaurado = f.read()
+
+        print("Teste de descompactação")
+        print(f"  Arquivo compactado:   {caminho_huff}")
+        print(f"  Arquivo restaurado:    {caminho_restaurado}")
+        print(f"  Texto restaurado:      {texto_restaurado!r}")
+        print(f"  Caracteres restaurados: {stats['caracteres_restaurados']}")
+
+        assert texto_restaurado == texto, "Texto restaurado difere do original"
+        assert stats["verificado"] is True, "Descompactação não foi verificada"
+
+        return stats
 
 
 if __name__ == "__main__":
-    texto = "ABRACADABRA"
-    print(f"Texto de teste: {texto}\n")
-
-    raiz, frequencias = construir_arvore(texto)
-    print("Árvore de Huffman:")
-    imprimir_arvore(raiz)
-
-    tabela = gerar_codigos(raiz)
-    print("\nCódigos Huffman:")
-    for char, codigo in sorted(tabela.items(), key=lambda x: (len(x[1]), x[0])):
-        label = "espaço" if char == " " else char
-        print(f"  {label!r}: {codigo}")
-
-    print("\nFrequências:")
-    for char, freq in frequencias.items():
-        label = "espaço" if char == " " else char
-        print(f"  {label!r}: {freq}")
-
+    teste_compactador()
+    print()
+    teste_descompactador()
 
