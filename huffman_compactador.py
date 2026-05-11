@@ -243,6 +243,8 @@ class App(tk.Tk):
 
         self._build_aba_compactar()
         self._build_aba_descompactar()
+        self._build_aba_stats()
+        self._build_aba_inspecionar()
 
     def _style_notebook(self, nb):
         s = ttk.Style()
@@ -280,8 +282,6 @@ class App(tk.Tk):
 
         self.log_comp = self._log_box(f)
 
-    # ── Aba Descompactar ───────────────────────────────────
-
     def _build_aba_descompactar(self):
         f = self.aba_decomp
         self._label(f, "Arquivo comprimido (.huff)").pack(anchor="w", padx=16, pady=(16,4))
@@ -303,6 +303,7 @@ class App(tk.Tk):
 
         self._btn_primario(f, "▶  Descompactar", self._executar_descompactacao).pack(pady=(0,16))
         self.log_decomp = self._log_box(f)
+
     def _executar_compactacao(self):
         entrada = self.entrada_comp.get().strip()
         saida   = self.saida_comp.get().strip()
@@ -346,6 +347,278 @@ class App(tk.Tk):
             self._log(self.log_decomp, f"✘  Erro: {e}", COR_VERMELHO)
             messagebox.showerror("Erro na descompactação", str(e))
 
+    def _build_aba_stats(self):
+        f = self.aba_stats
+        self.stats_frame = tk.Frame(f, bg=COR_BG)
+        self.stats_frame.pack(fill="both", expand=True, padx=16, pady=16)
+        self._label(self.stats_frame,
+            "Execute uma compactação para ver as estatísticas aqui.",
+            muted=True).pack(pady=40)
+
+    def _build_aba_inspecionar(self):
+        f = self.aba_inspec
+        self._label(f, "Arquivo .huff para inspecionar").pack(anchor="w", padx=16, pady=(16,4))
+
+        row = tk.Frame(f, bg=COR_BG)
+        row.pack(fill="x", padx=16, pady=(0,12))
+        self.entrada_inspec = self._entry(row)
+        self.entrada_inspec.pack(side="left", fill="x", expand=True)
+        self._btn(row, "Procurar", lambda: self._browse(self.entrada_inspec,
+            [("Huffman", "*.huff"), ("Todos", "*.*")])).pack(side="left", padx=(8,0))
+
+        self._btn_primario(f, "Inspecionar", self._executar_inspecao).pack(pady=(0,16))
+
+        frame = tk.Frame(f, bg=COR_PAINEL,
+                         highlightbackground=COR_BORDA, highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=16, pady=(0,16))
+        scroll_y = tk.Scrollbar(frame)
+        scroll_y.pack(side="right", fill="y")
+        scroll_x = tk.Scrollbar(frame, orient="horizontal")
+        scroll_x.pack(side="bottom", fill="x")
+        self.inspec_txt = tk.Text(
+            frame, bg=COR_PAINEL, fg=COR_TEXTO, font=FONTE_MONO,
+            bd=0, relief="flat",
+            yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set,
+            wrap="none", padx=10, pady=8, state="disabled", cursor="arrow"
+        )
+        self.inspec_txt.pack(fill="both", expand=True)
+        scroll_y.config(command=self.inspec_txt.yview)
+        scroll_x.config(command=self.inspec_txt.xview)
+
+        self.inspec_txt.tag_config("titulo", foreground=COR_ROXO,  font=("Consolas", 9, "bold"))
+        self.inspec_txt.tag_config("sep",    foreground=COR_BORDA)
+        self.inspec_txt.tag_config("chave",  foreground=COR_MUTED, font=("Consolas", 9))
+        self.inspec_txt.tag_config("char",   foreground=COR_ROXO,  font=("Consolas", 9, "bold"))
+        self.inspec_txt.tag_config("code",   foreground=COR_VERDE, font=("Consolas", 9))
+        self.inspec_txt.tag_config("num",    foreground="#e8c97a", font=("Consolas", 9))
+        self.inspec_txt.tag_config("bits",   foreground="#5dcaa5", font=("Consolas", 8))
+        self.inspec_txt.tag_config("muted",  foreground=COR_MUTED, font=("Consolas", 8))
+        self.inspec_txt.tag_config("ok",     foreground=COR_VERDE, font=("Consolas", 9, "bold"))
+        self.inspec_txt.tag_config("normal", foreground=COR_TEXTO, font=("Consolas", 9))
+
+    def _executar_inspecao(self):
+        caminho = self.entrada_inspec.get().strip()
+        if not caminho:
+            messagebox.showwarning("Atencao", "Selecione um arquivo .huff.")
+            return
+        if not os.path.exists(caminho):
+            messagebox.showerror("Erro", "Arquivo nao encontrado.")
+            return
+        try:
+            with open(caminho, "rb") as f:
+                pacote = pickle.load(f)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Nao foi possivel ler o arquivo:\n{e}")
+            return
+
+        raiz   = pacote["arvore"]
+        dados  = pacote["dados"]
+        nome   = pacote.get("nome_original", "desconhecido")
+        n_orig = pacote.get("tamanho_original", 0)
+
+        tabela = gerar_codigos(raiz)
+        freqs  = {}
+        def colher_freq(no):
+            if no is None: return
+            if no.char is not None: freqs[no.char] = no.freq
+            colher_freq(no.esq); colher_freq(no.dir)
+        colher_freq(raiz)
+
+        padding = dados[0]
+        n_bytes = len(dados) - 1
+        n_bits  = n_bytes * 8 - padding
+        tam_arq = os.path.getsize(caminho)
+
+        txt = self.inspec_txt
+        txt.config(state="normal")
+        txt.delete("1.0", "end")
+
+        def w(texto, tag="normal"):
+            txt.insert("end", texto, tag)
+
+        sep = "-" * 62 + "\n"
+
+        w("  INSPECAO DO ARQUIVO .huff\n\n", "titulo")
+
+        w("  CABECALHO\n", "titulo")
+        w(sep, "sep")
+        w(f"  {'Arquivo inspecionado':<28}", "chave");  w(f"{os.path.basename(caminho)}\n", "normal")
+        w(f"  {'Nome original gravado':<28}", "chave"); w(f"{nome}\n", "normal")
+        w(f"  {'Tamanho do .huff no disco':<28}", "chave"); w(f"{tam_arq:,} bytes\n", "num")
+        w(f"  {'Chars originais':<28}", "chave"); w(f"{n_orig:,}\n", "num")
+        w(f"  {'Bits de dados comprimidos':<28}", "chave"); w(f"{n_bits:,} bits  ", "num")
+        w(f"({n_bytes:,} bytes + padding de {padding} bits)\n", "muted")
+        w(f"  {'Simbolos unicos':<28}", "chave"); w(f"{len(tabela)}\n\n", "num")
+
+        w("  TABELA DE CODIGOS HUFFMAN\n", "titulo")
+        w(sep, "sep")
+        w(f"  {'Char':<10}{'Freq':<10}{'Codigo binario':<32}{'Bits':<6}Custo\n", "chave")
+        w("  " + "." * 60 + "\n", "sep")
+
+        for c, code in sorted(tabela.items(), key=lambda x: len(x[1])):
+            freq  = freqs.get(c, 0)
+            custo = freq * len(code)
+            label = "esp" if c == " " else repr(c)[1:-1]
+            w(f"  {label:<10}", "char")
+            w(f"{freq:<10}", "num")
+            w(f"{code:<32}", "code")
+            w(f"{len(code):<6}", "num")
+            w(f"{custo}\n", "muted")
+
+        w("\n")
+        w("  ESTRUTURA BINARIA\n", "titulo")
+        w(sep, "sep")
+        w("  Byte 0    ", "chave"); w(f"padding = {padding}", "num")
+        w("  (bits de preenchimento no fim)\n\n", "muted")
+        w("  Primeiros bytes em binario:\n", "chave")
+        for i, byte in enumerate(dados[1:9]):
+            w(f"  Byte {i+1:>2}   ", "chave")
+            w(f"{byte:08b}", "bits")
+            w(f"   (decimal {byte})\n", "muted")
+        if n_bytes > 8:
+            w(f"  ... mais {n_bytes - 8} bytes ...\n", "muted")
+
+        w("\n")
+        w("  RESUMO\n", "titulo")
+        w(sep, "sep")
+        bits_orig = n_orig * 8
+        if bits_orig:
+            # taxa real = compara tamanho total do .huff (inclui árvore) com o .txt original
+            taxa_real = (1 - tam_arq / n_orig) * 100
+            # taxa só dos dados = ignora overhead da árvore (número "otimista")
+            taxa_dados = (1 - n_bits / bits_orig) * 100
+            cor_taxa = "ok" if taxa_real > 0 else "char"
+            w(f"  {'Bytes originais (.txt)':<38}", "chave");       w(f"{n_orig:,} bytes\n", "num")
+            w(f"  {'Bytes do .huff (arquivo real)':<38}", "chave"); w(f"{tam_arq:,} bytes  ", "num")
+            w(f"(inclui arvore + dados)\n", "muted")
+            w(f"  {'Taxa real de compressao':<38}", "chave");       w(f"{taxa_real:.1f}%\n", cor_taxa)
+            w(f"\n  {'Apenas bits de dados (sem overhead)':<38}", "muted")
+            w(f"{n_bits:,} bits vs {bits_orig:,} bits", "muted")
+            w(f"  →  {taxa_dados:.1f}%\n", "muted")
+            w(f"  (esse numero ignora o peso da arvore serializada)\n\n", "muted")
+        w("  Arquivo integro. Arvore e dados decodificaveis.\n", "ok")
+
+        txt.config(state="disabled")
+
+    def _render_stats(self, s: dict):
+        for w in self.stats_frame.winfo_children():
+            w.destroy()
+
+        # Título
+        op = s.get("operacao", "")
+        cor_op = COR_VERDE if op == "Compactação" else COR_ROXO
+        tk.Label(self.stats_frame, text=f"Resultado: {op}",
+                 font=("Consolas", 11, "bold"), bg=COR_BG, fg=cor_op
+                 ).pack(anchor="w", pady=(0,12))
+
+        if op == "Compactação":
+            self._cards_comp(s)
+            self._tabela_codigos(s)
+        else:
+            self._cards_decomp(s)
+
+    def _cards_comp(self, s):
+        grid = tk.Frame(self.stats_frame, bg=COR_BG)
+        grid.pack(fill="x", pady=(0,16))
+        grid.columnconfigure((0,1,2,3), weight=1, uniform="col")
+
+        taxa = s["taxa_compressao"]
+        cor_taxa = COR_VERDE if taxa > 0 else COR_VERMELHO
+
+        items = [
+            ("Tamanho original",   f"{s['tamanho_original_bytes']:,} bytes", COR_TEXTO),
+            ("Tamanho comprimido", f"{s['tamanho_comprimido_bytes']:,} bytes", COR_TEXTO),
+            ("Taxa de compressão", f"{taxa:.1f}%", cor_taxa),
+            ("Tempo",              f"{s['tempo_segundos']*1000:.1f} ms", COR_TEXTO),
+            ("Caracteres únicos",  str(s["caracteres_unicos"]), COR_TEXTO),
+            ("Total de chars",     f"{s['total_caracteres']:,}", COR_TEXTO),
+            ("Entropia Shannon",   f"{s['entropia_shannon']:.3f} b/símbolo", COR_TEXTO),
+            ("Compr. médio Huff",  f"{s['comprimento_medio_huffman']:.3f} b/símbolo", COR_TEXTO),
+        ]
+        for i, (lbl, val, cor) in enumerate(items):
+            card = tk.Frame(grid, bg=COR_PAINEL, bd=0,
+                            highlightbackground=COR_BORDA, highlightthickness=1)
+            card.grid(row=i//4, column=i%4, padx=4, pady=4, sticky="nsew")
+            tk.Label(card, text=lbl, font=("Consolas", 8), bg=COR_PAINEL,
+                     fg=COR_MUTED).pack(anchor="w", padx=10, pady=(8,0))
+            tk.Label(card, text=val, font=("Consolas", 12, "bold"),
+                     bg=COR_PAINEL, fg=cor).pack(anchor="w", padx=10, pady=(2,8))
+
+        # Barra visual de compressão
+        pct = max(0, min(100, s["taxa_compressao"]))
+        tk.Label(self.stats_frame, text="Redução de tamanho",
+                 font=("Consolas", 9), bg=COR_BG, fg=COR_MUTED
+                 ).pack(anchor="w", pady=(4,4))
+        canvas = tk.Canvas(self.stats_frame, height=16, bg=COR_PAINEL,
+                           bd=0, highlightthickness=0)
+        canvas.pack(fill="x", pady=(0,16))
+        canvas.update_idletasks()
+        w = canvas.winfo_width() or 700
+        canvas.create_rectangle(0, 0, w, 16, fill=COR_BORDA, outline="")
+        canvas.create_rectangle(0, 0, w * (pct/100), 16, fill=COR_VERDE, outline="")
+        canvas.create_text(w//2, 8, text=f"{pct:.1f}% economizado",
+                           fill=COR_TEXTO, font=("Consolas", 8))
+
+    def _cards_decomp(self, s):
+        grid = tk.Frame(self.stats_frame, bg=COR_BG)
+        grid.pack(fill="x", pady=(0,16))
+        grid.columnconfigure((0,1,2), weight=1, uniform="col")
+        items = [
+            ("Arquivo original",       s.get("nome_original", "—"),   COR_TEXTO),
+            ("Caracteres restaurados", f"{s['caracteres_restaurados']:,}", COR_VERDE),
+            ("Tempo",                  f"{s['tempo_segundos']*1000:.1f} ms", COR_TEXTO),
+        ]
+        for i, (lbl, val, cor) in enumerate(items):
+            card = tk.Frame(grid, bg=COR_PAINEL, bd=0,
+                            highlightbackground=COR_BORDA, highlightthickness=1)
+            card.grid(row=0, column=i, padx=4, pady=4, sticky="nsew")
+            tk.Label(card, text=lbl, font=("Consolas", 8), bg=COR_PAINEL,
+                     fg=COR_MUTED).pack(anchor="w", padx=10, pady=(8,0))
+            tk.Label(card, text=val, font=("Consolas", 12, "bold"),
+                     bg=COR_PAINEL, fg=cor).pack(anchor="w", padx=10, pady=(2,8))
+        ok = tk.Label(self.stats_frame,
+                      text="✔  Arquivo restaurado e verificado com sucesso.",
+                      font=("Consolas", 10), bg=COR_BG, fg=COR_VERDE)
+        ok.pack(pady=12)
+
+    def _tabela_codigos(self, s):
+        tk.Label(self.stats_frame, text="Tabela de códigos Huffman",
+                 font=("Consolas", 9, "bold"), bg=COR_BG, fg=COR_MUTED
+                 ).pack(anchor="w", pady=(4,6))
+
+        frame = tk.Frame(self.stats_frame, bg=COR_PAINEL,
+                         highlightbackground=COR_BORDA, highlightthickness=1)
+        frame.pack(fill="both", expand=True)
+
+        scroll = tk.Scrollbar(frame)
+        scroll.pack(side="right", fill="y")
+        txt = tk.Text(frame, bg=COR_PAINEL, fg=COR_TEXTO, font=FONTE_MONO,
+                      bd=0, relief="flat", yscrollcommand=scroll.set,
+                      height=10, padx=10, pady=8, cursor="arrow",
+                      state="normal")
+        txt.pack(fill="both", expand=True)
+        scroll.config(command=txt.yview)
+        txt.tag_config("hdr",   foreground=COR_MUTED)
+        txt.tag_config("char",  foreground=COR_ROXO,   font=("Consolas", 9, "bold"))
+        txt.tag_config("code",  foreground=COR_VERDE)
+        txt.tag_config("freq",  foreground=COR_TEXTO)
+
+        txt.insert("end", f"{'Char':<8}{'Freq':<8}{'Código':<28}{'Bits':<6}Custo\n", "hdr")
+        txt.insert("end", "─"*58 + "\n", "hdr")
+
+        tabela = s["tabela"]
+        freqs  = s["frequencias"]
+        n      = s["total_caracteres"]
+        for c, code in sorted(tabela.items(), key=lambda x: len(x[1])):
+            f = freqs[c]
+            label = "␣" if c == " " else repr(c)[1:-1]
+            txt.insert("end", f"{label:<8}", "char")
+            txt.insert("end", f"{f:<8}", "freq")
+            txt.insert("end", f"{code:<28}", "code")
+            txt.insert("end", f"{len(code):<6}{f*len(code)}\n", "freq")
+
+        txt.config(state="disabled")
+    
     def _label(self, pai, texto, muted=False):
         return tk.Label(pai, text=texto,
                         font=("Consolas", 9), bg=COR_BG,
