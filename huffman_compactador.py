@@ -6,6 +6,7 @@ from tkinter import ttk
 from collections import Counter
 import math
 import time
+from tkinter import messagebox
 class No:
     #Nó da árvore binária de Huffman.
     def __init__(self, char, freq):
@@ -239,6 +240,9 @@ class App(tk.Tk):
         nb.add(self.aba_stats,  text="  Estatísticas  ")
         nb.add(self.aba_inspec, text="  Inspecionar .huff  ")
 
+        self._build_aba_compactar()
+        self._build_aba_descompactar()
+
     def _style_notebook(self, nb):
         s = ttk.Style()
         s.theme_use("default")
@@ -251,7 +255,142 @@ class App(tk.Tk):
         s.map("TNotebook.Tab",
               background=[("selected", COR_ROXO_ESC)],
               foreground=[("selected", COR_TEXTO)])
-        
+
+    def _build_aba_compactar(self):
+        f = self.aba_comp
+        self._label(f, "Arquivo de entrada (.txt)").pack(anchor="w", padx=16, pady=(16,4))
+
+        row = tk.Frame(f, bg=COR_BG)
+        row.pack(fill="x", padx=16, pady=(0,12))
+        self.entrada_comp = self._entry(row)
+        self.entrada_comp.pack(side="left", fill="x", expand=True)
+        self._btn(row, "Procurar", lambda: self._browse(self.entrada_comp,
+            [("Texto", "*.txt"), ("Todos", "*.*")])).pack(side="left", padx=(8,0))
+
+        self._label(f, "Arquivo de saída (.huff)").pack(anchor="w", padx=16, pady=(0,4))
+        row2 = tk.Frame(f, bg=COR_BG)
+        row2.pack(fill="x", padx=16, pady=(0,20))
+        self.saida_comp = self._entry(row2)
+        self.saida_comp.pack(side="left", fill="x", expand=True)
+        self._btn(row2, "Salvar como", lambda: self._save_as(self.saida_comp,
+            [("Huffman", "*.huff")], ".huff")).pack(side="left", padx=(8,0))
+
+        self._btn_primario(f, "▶  Compactar", self._executar_compactacao).pack(pady=(0,16))
+
+        self.log_comp = self._log_box(f)
+
+    # ── Aba Descompactar ───────────────────────────────────
+
+    def _build_aba_descompactar(self):
+        f = self.aba_decomp
+        self._label(f, "Arquivo comprimido (.huff)").pack(anchor="w", padx=16, pady=(16,4))
+
+        row = tk.Frame(f, bg=COR_BG)
+        row.pack(fill="x", padx=16, pady=(0,12))
+        self.entrada_decomp = self._entry(row)
+        self.entrada_decomp.pack(side="left", fill="x", expand=True)
+        self._btn(row, "Procurar", lambda: self._browse(self.entrada_decomp,
+            [("Huffman", "*.huff"), ("Todos", "*.*")])).pack(side="left", padx=(8,0))
+
+        self._label(f, "Arquivo de saída (.txt)").pack(anchor="w", padx=16, pady=(0,4))
+        row2 = tk.Frame(f, bg=COR_BG)
+        row2.pack(fill="x", padx=16, pady=(0,20))
+        self.saida_decomp = self._entry(row2)
+        self.saida_decomp.pack(side="left", fill="x", expand=True)
+        self._btn(row2, "Salvar como", lambda: self._save_as(self.saida_decomp,
+            [("Texto", "*.txt")], ".txt")).pack(side="left", padx=(8,0))
+
+        self._btn_primario(f, "▶  Descompactar", self._executar_descompactacao).pack(pady=(0,16))
+        self.log_decomp = self._log_box(f)
+    def _executar_compactacao(self):
+        entrada = self.entrada_comp.get().strip()
+        saida   = self.saida_comp.get().strip()
+        if not entrada or not saida:
+            messagebox.showwarning("Atenção", "Selecione os arquivos de entrada e saída.")
+            return
+        if not os.path.exists(entrada):
+            messagebox.showerror("Erro", "Arquivo de entrada não encontrado.")
+            return
+        try:
+            self._log(self.log_comp, f"Compactando: {os.path.basename(entrada)} …")
+            stats = compactar_arquivo(entrada, saida)
+            self._log(self.log_comp,
+                f"✔  Concluído em {stats['tempo_segundos']*1000:.1f} ms  |  "
+                f"Taxa: {stats['taxa_compressao']:.1f}%  |  "
+                f"Salvo em: {os.path.basename(saida)}", COR_VERDE)
+            self.stats = stats
+            self._render_stats(stats)
+        except Exception as e:
+            self._log(self.log_comp, f"✘  Erro: {e}", COR_VERMELHO)
+            messagebox.showerror("Erro na compactação", str(e))
+
+    def _executar_descompactacao(self):
+        entrada = self.entrada_decomp.get().strip()
+        saida   = self.saida_decomp.get().strip()
+        if not entrada or not saida:
+            messagebox.showwarning("Atenção", "Selecione os arquivos de entrada e saída.")
+            return
+        if not os.path.exists(entrada):
+            messagebox.showerror("Erro", "Arquivo de entrada não encontrado.")
+            return
+        try:
+            self._log(self.log_decomp, f"Descompactando: {os.path.basename(entrada)} …")
+            stats = descompactar_arquivo(entrada, saida)
+            self._log(self.log_decomp,
+                f"✔  Concluído em {stats['tempo_segundos']*1000:.1f} ms  |  "
+                f"{stats['caracteres_restaurados']:,} caracteres restaurados.", COR_VERDE)
+            self.stats = stats
+            self._render_stats(stats)
+        except Exception as e:
+            self._log(self.log_decomp, f"✘  Erro: {e}", COR_VERMELHO)
+            messagebox.showerror("Erro na descompactação", str(e))
+
+    def _label(self, pai, texto, muted=False):
+        return tk.Label(pai, text=texto,
+                        font=("Consolas", 9), bg=COR_BG,
+                        fg=COR_MUTED if muted else COR_TEXTO)
+
+    def _entry(self, pai):
+        e = tk.Entry(pai, font=FONTE_MONO, bg=COR_PAINEL, fg=COR_TEXTO,
+                     insertbackground=COR_TEXTO, relief="flat", bd=0,
+                     highlightbackground=COR_BORDA, highlightthickness=1)
+        e.configure(width=45)
+        return e
+
+    def _btn(self, pai, texto, cmd):
+        return tk.Button(pai, text=texto, command=cmd,
+                         font=("Consolas", 9), bg=COR_PAINEL, fg=COR_TEXTO,
+                         activebackground=COR_BORDA, activeforeground=COR_TEXTO,
+                         relief="flat", bd=0, cursor="hand2", padx=12, pady=5,
+                         highlightbackground=COR_BORDA, highlightthickness=1)
+
+    def _btn_primario(self, pai, texto, cmd):
+        return tk.Button(pai, text=texto, command=cmd,
+                         font=("Consolas", 10, "bold"),
+                         bg=COR_ROXO_ESC, fg=COR_TEXTO,
+                         activebackground=COR_ROXO, activeforeground=COR_TEXTO,
+                         relief="flat", bd=0, cursor="hand2", padx=20, pady=8)
+
+    def _log_box(self, pai):
+        frame = tk.Frame(pai, bg=COR_PAINEL,
+                         highlightbackground=COR_BORDA, highlightthickness=1)
+        frame.pack(fill="both", expand=True, padx=16, pady=(0,16))
+        scroll = tk.Scrollbar(frame)
+        scroll.pack(side="right", fill="y")
+        txt = tk.Text(frame, bg=COR_PAINEL, fg=COR_MUTED, font=FONTE_MONO,
+                      bd=0, relief="flat", yscrollcommand=scroll.set,
+                      height=6, padx=8, pady=6, state="disabled", cursor="arrow")
+        txt.pack(fill="both", expand=True)
+        scroll.config(command=txt.yview)
+        return txt
+
+    def _log(self, widget, msg, cor=None):
+        widget.config(state="normal")
+        tag = f"c{id(cor)}"
+        widget.tag_config(tag, foreground=cor or COR_MUTED)
+        widget.insert("end", msg + "\n", tag)
+        widget.see("end")
+        widget.config(state="disabled")
 
 
 if __name__ == "__main__":
