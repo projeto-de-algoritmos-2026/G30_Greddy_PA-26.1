@@ -12,6 +12,7 @@ class No:
     def __lt__(self, outro):
         return self.freq < outro.freq
 
+
 def construir_arvore(texto: str) -> tuple[No, dict]:
     #Constrói a árvore de Huffman via algoritmo guloso
 
@@ -36,6 +37,7 @@ def construir_arvore(texto: str) -> tuple[No, dict]:
 
     return heap[0], frequencias
 
+
 def gerar_codigos(raiz: No, prefixo: str = "", tabela: dict = None) -> dict:
     #Percorre a árvore e atribui código binário a cada folha.
     if tabela is None:
@@ -49,6 +51,20 @@ def gerar_codigos(raiz: No, prefixo: str = "", tabela: dict = None) -> dict:
     gerar_codigos(raiz.dir, prefixo + "1", tabela)
     return tabela
 
+def codificar(texto: str, tabela: dict) -> str:
+    #Converte texto em string de bits usando a tabela de Huffman
+    return "".join(tabela[c] for c in texto)
+
+
+def bits_para_bytes(bits: str) -> bytes:
+    # Converte string de bits em bytes.
+    padding = (8 - len(bits) % 8) % 8
+    bits += "0" * padding
+    resultado = bytearray()
+    resultado.append(padding)          
+    for i in range(0, len(bits), 8):
+        resultado.append(int(bits[i:i+8], 2))
+    return bytes(resultado)
 
 
 
@@ -83,3 +99,5 @@ if __name__ == "__main__":
     for char, freq in frequencias.items():
         label = "espaço" if char == " " else char
         print(f"  {label!r}: {freq}")
+
+
