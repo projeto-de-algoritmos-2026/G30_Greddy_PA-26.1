@@ -67,6 +67,27 @@ def bits_para_bytes(bits: str) -> bytes:
     return bytes(resultado)
 
 
+def bytes_para_bits(dados: bytes) -> str:
+    # Reverte bytes para string de bits
+    padding = dados[0]
+    bits = "".join(f"{b:08b}" for b in dados[1:])
+    if padding:
+        bits = bits[:-padding]
+    return bits
+
+
+def decodificar(bits: str, raiz: No) -> str:
+    #Percorre a árvore seguindo os bits para recuperar o texto original
+    resultado = []
+    no_atual = raiz
+    for bit in bits:
+        no_atual = no_atual.esq if bit == "0" else no_atual.dir
+        if no_atual.char is not None:
+            resultado.append(no_atual.char)
+            no_atual = raiz
+    return "".join(resultado)
+
+
 
 #Testando a criação da arvore
 def imprimir_arvore(no, nivel=0):
