@@ -7,6 +7,7 @@ Conteúdo da Disciplina: Algoritmos Ambiciosos<br>
 
 ## Alunos
 |Matrícula | Aluno |
+| -- | -- |
 | 20/0032364  |  Vitor Gabriel Gonçalves Dias |
 | 22/1008632  |  Eduardo Ferreira |
 
@@ -17,8 +18,11 @@ O algoritmo constrói uma árvore binária de codificação com base na frequên
 Funcionalidades:
 
 Compactar arquivos .txt gerando arquivos .huff.
+
 Descompactar arquivos .huff restaurando o texto original com fidelidade total.
+
 Exibir estatísticas detalhadas: taxa de compressão, entropia de Shannon, comprimento médio dos códigos e tabela completa de codificação.
+
 Inspecionar o conteúdo interno de um arquivo .huff (árvore, bits, overhead)
 
 ## Screenshots
