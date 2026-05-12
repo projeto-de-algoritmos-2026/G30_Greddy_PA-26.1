@@ -92,6 +92,10 @@ Mostra: tamanho original vs comprimido, taxa de compressão, tempo, entropia de 
 Selecione qualquer arquivo .huff e clique em "Inspecionar"
 Revela o conteúdo interno: cabeçalho, tabela de códigos, visualização binária dos bytes e taxa de compressão real (considerando o overhead da árvore serializada)
 
+## Vídeo - Apresentação
+[![Assistir no YouTube](https://img.youtube.com/vi/UQluK6qv6BM/0.jpg)](https://www.youtube.com/watch?v=UQluK6qv6BM)
+
+
 ## Outros 
 Por que o arquivo pode crescer em vez de encolher?
 O Huffman tem um custo fixo: a árvore de codificação precisa ser gravada dentro do .huff para que a descompactação seja possível. Em arquivos muito pequenos (geralmente abaixo de ~500 caracteres), esse overhead pode superar o ganho da compressão, fazendo o arquivo resultante ser maior que o original. Esse comportamento é esperado e está documentado na aba de Estatísticas.
